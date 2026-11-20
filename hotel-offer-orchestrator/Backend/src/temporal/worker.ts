@@ -3,7 +3,7 @@ import { Worker } from "@temporalio/worker";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
 import { fetchSupplierAOffers, fetchSupplierBOffers } from "./activities/supplier.activities";
-import { saveOffersToCache, getOffersFromCache } from "./activities/cache.activities";
+import { saveOffersToCache } from "./activities/cache.activities";
 
 async function run(): Promise<void> {
   const worker = await Worker.create({
@@ -12,7 +12,6 @@ async function run(): Promise<void> {
       fetchSupplierAOffers,
       fetchSupplierBOffers,
       saveOffersToCache,
-      getOffersFromCache,
     },
     taskQueue: env.TEMPORAL_TASK_QUEUE,
   });

@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+/** Coerces "true"/"false" strings to booleans safely */
+const boolFlag = z
+  .string()
+  .toLowerCase()
+  .pipe(z.enum(["true", "false"]))
+  .transform((v) => v === "true")
+  .default("false");
+
 const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "production", "test"])
@@ -14,6 +22,11 @@ const envSchema = z.object({
 
   SUPPLIER_A_URL: z.string().url(),
   SUPPLIER_B_URL: z.string().url(),
+
+  /** Set to "true" to make GET /supplierA/hotels return 503 */
+  SUPPLIER_A_DOWN: boolFlag,
+  /** Set to "true" to make GET /supplierB/hotels return 503 */
+  SUPPLIER_B_DOWN: boolFlag,
 
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace"])

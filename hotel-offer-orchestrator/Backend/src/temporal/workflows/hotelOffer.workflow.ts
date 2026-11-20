@@ -5,11 +5,11 @@
  *   - No network calls, no Redis, no logger, no Date.now(), no Math.random()
  *   - Only pure helpers and @temporalio/workflow imports are allowed here
  */
-import { proxyActivities, ActivityOptions } from "@temporalio/workflow";
+import { proxyActivities, ActivityOptions, ApplicationFailure } from "@temporalio/workflow";
 import type { fetchSupplierAOffers, fetchSupplierBOffers } from "../activities/supplier.activities";
 import type { saveOffersToCache } from "../activities/cache.activities";
 import { mergeOffers } from "../../utils/mergeOffers";
-import { HotelOffer } from "../../types/hotel.types";
+import { HotelOffer, WorkflowResult } from "../../types/hotel.types";
 
 /** Shared type describing all activities used by this workflow */
 type Activities = {
@@ -27,26 +27,52 @@ const activityOptions: ActivityOptions = {
   },
 };
 
-// All three activities proxied through a single call — no name shadowing
 const acts = proxyActivities<Activities>(activityOptions);
 
 /**
  * @workflow hotelOfferWorkflow
- * @description Fetches offers from both suppliers in parallel, dedupes by name
- *              keeping the cheaper price, then caches the result in Redis.
+ * @description Runs both supplier activities in parallel, tolerates one failure,
+ *              merges surviving offers, caches the result in Redis, and returns
+ *              { hotels, warnings }.
  */
-export async function hotelOfferWorkflow(city: string): Promise<HotelOffer[]> {
-  // Fetch both suppliers IN PARALLEL
-  const [offersA, offersB] = await Promise.all([
-    acts.fetchSupplierAOffers(),
-    acts.fetchSupplierBOffers(),
+export async function hotelOfferWorkflow(city: string): Promise<WorkflowResult> {
+  const warnings: string[] = [];
+  let offersA: HotelOffer[] | null = null;
+  let offersB: HotelOffer[] | null = null;
+
+  const [resA, resB] = await Promise.allSettled([
+    acts.fetchSupplierAOffers(city),
+    acts.fetchSupplierBOffers(city),
   ]);
 
-  // Pure merge — no I/O, deterministic
-  const merged = mergeOffers(offersA, offersB);
+  if (resA.status === "fulfilled") {
+    offersA = resA.value;
+  } else {
+    warnings.push("Supplier A unavailable");
+  }
 
-  // Persist to Redis via activity (5 s timeout, default retry)
+  if (resB.status === "fulfilled") {
+    offersB = resB.value;
+  } else {
+    warnings.push("Supplier B unavailable");
+  }
+
+  // If BOTH suppliers failed
+  if (offersA === null && offersB === null) {
+    throw ApplicationFailure.nonRetryable("All suppliers unavailable");
+  }
+
+  const validA = offersA ?? [];
+  const validB = offersB ?? [];
+
+  // Deterministic pure merge
+  const merged = mergeOffers(validA, validB);
+
+  // Persist to Redis via activity
   await acts.saveOffersToCache(city, merged);
 
-  return merged;
+  return {
+    hotels: merged,
+    warnings,
+  };
 }

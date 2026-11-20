@@ -1,5 +1,15 @@
 export type Supplier = "Supplier A" | "Supplier B";
 
+/** Shape returned by /supplierA/hotels and /supplierB/hotels mock endpoints */
+export interface RawSupplierHotel {
+  hotelId: string;
+  name: string;
+  price: number;
+  city: string;
+  commissionPct: number;
+}
+
+/** Normalised offer shape used throughout the application */
 export interface HotelOffer {
   name: string;
   price: number;
@@ -7,17 +17,17 @@ export interface HotelOffer {
   commissionPct: number;
 }
 
-export interface RawHotelOffer {
-  name: string;
-  price: number;
-  supplier: Supplier;
-  commissionPct: number;
-}
-
+/** Query params accepted by GET /api/hotels */
 export interface GetHotelsQuery {
   city: string;
   minPrice?: number;
   maxPrice?: number;
+}
+
+/** Return value of hotelOfferWorkflow */
+export interface WorkflowResult {
+  hotels: HotelOffer[];
+  warnings: string[];
 }
 
 export interface SupplierHealthStatus {

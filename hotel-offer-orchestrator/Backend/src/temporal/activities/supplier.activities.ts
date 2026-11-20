@@ -1,41 +1,76 @@
 import axios from "axios";
-import { HotelOffer } from "../../types/hotel.types";
+import { HotelOffer, RawSupplierHotel } from "../../types/hotel.types";
 import { env } from "../../config/env";
 import { logger } from "../../config/logger";
 
 /**
- * Fetches hotel offers from Supplier A's mock endpoint.
+ * Fetches hotel offers from Supplier A's mock endpoint for a given city.
  * Retryable: Temporal will retry on transient failures per workflow RetryPolicy.
  */
-export async function fetchSupplierAOffers(): Promise<HotelOffer[]> {
+export async function fetchSupplierAOffers(city: string): Promise<HotelOffer[]> {
   const url = env.SUPPLIER_A_URL;
-  logger.info({ url }, "Fetching Supplier A offers");
+  const start = Date.now();
+  logger.info({ activity: "fetchSupplierAOffers", city, url }, "Fetching Supplier A offers");
 
   try {
-    const response = await axios.get<HotelOffer[]>(url, { timeout: 5000 });
-    logger.info({ count: response.data.length }, "Supplier A responded");
-    return response.data;
+    const response = await axios.get<RawSupplierHotel[]>(url, {
+      params: { city },
+      timeout: 5000,
+    });
+    const durationMs = Date.now() - start;
+    const rawHotels = response.data;
+
+    const mappedOffers: HotelOffer[] = rawHotels.map((h) => ({
+      name: h.name,
+      price: h.price,
+      supplier: "Supplier A",
+      commissionPct: h.commissionPct,
+    }));
+
+    logger.info(
+      { activity: "fetchSupplierAOffers", city, count: mappedOffers.length, durationMs },
+      "Supplier A responded",
+    );
+    return mappedOffers;
   } catch (err) {
-    logger.error({ err, url }, "Supplier A fetch failed");
-    // Re-throw as a plain Error — Temporal wraps it in ApplicationFailure automatically
-    throw new Error(`Supplier A fetch failed: ${(err as Error).message}`);
+    const durationMs = Date.now() - start;
+    logger.error({ activity: "fetchSupplierAOffers", city, durationMs, err }, "Supplier A fetch failed");
+    throw err;
   }
 }
 
 /**
- * Fetches hotel offers from Supplier B's mock endpoint.
+ * Fetches hotel offers from Supplier B's mock endpoint for a given city.
  * Retryable: Temporal will retry on transient failures per workflow RetryPolicy.
  */
-export async function fetchSupplierBOffers(): Promise<HotelOffer[]> {
+export async function fetchSupplierBOffers(city: string): Promise<HotelOffer[]> {
   const url = env.SUPPLIER_B_URL;
-  logger.info({ url }, "Fetching Supplier B offers");
+  const start = Date.now();
+  logger.info({ activity: "fetchSupplierBOffers", city, url }, "Fetching Supplier B offers");
 
   try {
-    const response = await axios.get<HotelOffer[]>(url, { timeout: 5000 });
-    logger.info({ count: response.data.length }, "Supplier B responded");
-    return response.data;
+    const response = await axios.get<RawSupplierHotel[]>(url, {
+      params: { city },
+      timeout: 5000,
+    });
+    const durationMs = Date.now() - start;
+    const rawHotels = response.data;
+
+    const mappedOffers: HotelOffer[] = rawHotels.map((h) => ({
+      name: h.name,
+      price: h.price,
+      supplier: "Supplier B",
+      commissionPct: h.commissionPct,
+    }));
+
+    logger.info(
+      { activity: "fetchSupplierBOffers", city, count: mappedOffers.length, durationMs },
+      "Supplier B responded",
+    );
+    return mappedOffers;
   } catch (err) {
-    logger.error({ err, url }, "Supplier B fetch failed");
-    throw new Error(`Supplier B fetch failed: ${(err as Error).message}`);
+    const durationMs = Date.now() - start;
+    logger.error({ activity: "fetchSupplierBOffers", city, durationMs, err }, "Supplier B fetch failed");
+    throw err;
   }
 }
