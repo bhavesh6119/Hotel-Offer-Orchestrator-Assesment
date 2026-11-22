@@ -18,6 +18,7 @@ app.use(requestLogger);
 app.use("/api/hotels", hotelRoutes);
 app.use("/", supplierRoutes);
 app.use("/health", healthRoutes);
+app.use("/api/health", healthRoutes); // Alias for GET /api/health
 
 // Global error handler (must be last)
 app.use(errorHandler);

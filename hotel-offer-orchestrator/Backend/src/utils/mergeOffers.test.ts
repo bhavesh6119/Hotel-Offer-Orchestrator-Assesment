@@ -83,4 +83,26 @@ describe("mergeOffers", () => {
     const res2 = mergeOffers(offersB, offersA);
     assert.equal(res2[0].supplier, "Supplier A");
   });
+
+  test("sorts results by price ascending, tie-breaking by name A-Z", () => {
+    const offersA: HotelOffer[] = [
+      { name: "Zebra Lodge", price: 3000, supplier: "Supplier A", commissionPct: 10 },
+      { name: "Alpine Resort", price: 3000, supplier: "Supplier A", commissionPct: 10 },
+    ];
+    const offersB: HotelOffer[] = [
+      { name: "Budget Stay", price: 1500, supplier: "Supplier B", commissionPct: 5 },
+      { name: "Luxury Haven", price: 5000, supplier: "Supplier B", commissionPct: 15 },
+    ];
+
+    const result = mergeOffers(offersA, offersB);
+    assert.equal(result.length, 4);
+    assert.equal(result[0].name, "Budget Stay");
+    assert.equal(result[0].price, 1500);
+    assert.equal(result[1].name, "Alpine Resort");
+    assert.equal(result[1].price, 3000);
+    assert.equal(result[2].name, "Zebra Lodge");
+    assert.equal(result[2].price, 3000);
+    assert.equal(result[3].name, "Luxury Haven");
+    assert.equal(result[3].price, 5000);
+  });
 });

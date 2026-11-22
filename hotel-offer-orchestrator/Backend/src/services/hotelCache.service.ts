@@ -36,13 +36,16 @@ export async function hasCity(city: string): Promise<boolean> {
  * Redis Sorted Sets (ZSET) index members by numeric score using an internal skip list + hash table.
  * Storing price as the score enables O(log(N) + M) range queries directly in Redis via ZRANGEBYSCORE,
  * avoiding the need to load, deserialize, and scan all hotels in Node.js application memory.
+ *
+ * When partial is true (e.g. one supplier was down), PARTIAL_CACHE_TTL_SECONDS is used.
  */
 export async function saveHotels(
   city: string,
   hotels: HotelOffer[],
+  partial = false,
 ): Promise<void> {
   const normCity = getCityNormalized(city);
-  const ttl = env.CACHE_TTL_SECONDS;
+  const ttl = partial ? env.PARTIAL_CACHE_TTL_SECONDS : env.CACHE_TTL_SECONDS;
   const zKey = zsetKey(normCity);
   const mKey = metaKey(normCity);
 
@@ -81,7 +84,7 @@ export async function saveHotels(
   pipeline.set(mKey, "1", "EX", ttl);
 
   await pipeline.exec();
-  logger.info({ city: normCity, count: hotels.length, ttl }, "Saved hotels to Redis cache");
+  logger.info({ city: normCity, count: hotels.length, ttl, partial }, "Saved hotels to Redis cache");
 }
 
 /**

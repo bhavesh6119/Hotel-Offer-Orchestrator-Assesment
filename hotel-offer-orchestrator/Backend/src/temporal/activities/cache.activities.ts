@@ -8,6 +8,7 @@ import * as hotelCache from "../../services/hotelCache.service";
 export async function saveOffersToCache(
   city: string,
   offers: HotelOffer[],
+  partial = false,
 ): Promise<void> {
-  await hotelCache.saveHotels(city, offers);
+  await hotelCache.saveHotels(city, offers, partial);
 }

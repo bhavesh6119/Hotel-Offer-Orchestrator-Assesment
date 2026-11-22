@@ -7,6 +7,7 @@ import { normalizeName } from "./normalizeName";
  * 1. Cheaper offer wins.
  * 2. Tie-break: lower commissionPct wins.
  * 3. Tie-break: Supplier A wins over Supplier B.
+ * Returns results sorted by price ascending (tie -> name A-Z).
  * Pure function — no I/O, no side effects.
  */
 export function mergeOffers(
@@ -15,7 +16,6 @@ export function mergeOffers(
 ): HotelOffer[] {
   const map = new Map<string, HotelOffer>();
 
-  // Determine if incoming offer is preferred over existing offer
   function isBetterOffer(candidate: HotelOffer, existing: HotelOffer): boolean {
     if (candidate.price < existing.price) {
       return true;
@@ -49,5 +49,15 @@ export function mergeOffers(
     }
   }
 
-  return Array.from(map.values());
+  const results = Array.from(map.values());
+
+  // Sort by price ascending, tie-break by name A-Z
+  results.sort((a, b) => {
+    if (a.price !== b.price) {
+      return a.price - b.price;
+    }
+    return a.name.localeCompare(b.name);
+  });
+
+  return results;
 }

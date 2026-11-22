@@ -65,11 +65,14 @@ export async function hotelOfferWorkflow(city: string): Promise<WorkflowResult> 
   const validA = offersA ?? [];
   const validB = offersB ?? [];
 
-  // Deterministic pure merge
+  // Deterministic pure merge (sorted by price ascending, tie -> name A-Z)
   const merged = mergeOffers(validA, validB);
 
+  // When warnings.length > 0, result is partial and gets a shorter TTL
+  const isPartial = warnings.length > 0;
+
   // Persist to Redis via activity
-  await acts.saveOffersToCache(city, merged);
+  await acts.saveOffersToCache(city, merged, isPartial);
 
   return {
     hotels: merged,

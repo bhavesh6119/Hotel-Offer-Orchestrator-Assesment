@@ -10,7 +10,7 @@
     "worker": "ts-node --transpile-only src/temporal/worker.ts",
     "worker:dev": "ts-node-dev --respawn --transpile-only src/temporal/worker.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --test dist/src/utils/mergeOffers.test.js"
+    "test": "npm run build && node --test dist/src/utils/mergeOffers.test.js"
   },
   "dependencies": {
     "@temporalio/activity": "^1.11.0",

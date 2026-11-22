@@ -1,16 +1,21 @@
-version: "3.9"
-
 services:
-  redis:
-    image: redis:7-alpine
-    container_name: hoo-redis
+  postgres:
+    image: postgres:12-alpine
+    container_name: hoo-postgres
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal_password
+      POSTGRES_DB: temporal
     ports:
-      - "6379:6379"
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U temporal -d temporal"]
+      interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   temporal:
     image: temporalio/auto-setup:1.24
@@ -18,10 +23,14 @@ services:
     ports:
       - "7233:7233"
     environment:
-      - DB=sqlite
+      - DB=postgres12
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal_password
+      - POSTGRES_SEEDS=postgres
     depends_on:
-      redis:
+      postgres:
         condition: service_healthy
+    restart: unless-stopped
 
   temporal-ui:
     image: temporalio/ui:2.26.2
@@ -32,6 +41,19 @@ services:
       - TEMPORAL_ADDRESS=temporal:7233
     depends_on:
       - temporal
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: hoo-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
   app:
     build:
@@ -47,8 +69,11 @@ services:
       - TEMPORAL_ADDRESS=temporal:7233
       - TEMPORAL_NAMESPACE=default
       - TEMPORAL_TASK_QUEUE=hotel-offers
-      - SUPPLIER_A_URL=http://localhost:3000/supplierA/hotels
-      - SUPPLIER_B_URL=http://localhost:3000/supplierB/hotels
+      - SUPPLIER_A_URL=http://app:3000/supplierA/hotels
+      - SUPPLIER_B_URL=http://app:3000/supplierB/hotels
+      - SUPPLIER_A_DOWN=${SUPPLIER_A_DOWN:-false}
+      - SUPPLIER_B_DOWN=${SUPPLIER_B_DOWN:-false}
+      - PARTIAL_CACHE_TTL_SECONDS=${PARTIAL_CACHE_TTL_SECONDS:-30}
       - LOG_LEVEL=info
       - CACHE_TTL_SECONDS=300
     depends_on:
@@ -56,4 +81,40 @@ services:
         condition: service_healthy
       temporal:
         condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 || r.statusCode === 503 ? 0 : 1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
+
+  worker:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    container_name: hoo-worker
+    command: ["node", "dist/src/temporal/worker.js"]
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_NAMESPACE=default
+      - TEMPORAL_TASK_QUEUE=hotel-offers
+      - SUPPLIER_A_URL=http://app:3000/supplierA/hotels
+      - SUPPLIER_B_URL=http://app:3000/supplierB/hotels
+      - SUPPLIER_A_DOWN=${SUPPLIER_A_DOWN:-false}
+      - SUPPLIER_B_DOWN=${SUPPLIER_B_DOWN:-false}
+      - PARTIAL_CACHE_TTL_SECONDS=${PARTIAL_CACHE_TTL_SECONDS:-30}
+      - LOG_LEVEL=info
+      - CACHE_TTL_SECONDS=300
+    depends_on:
+      redis:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

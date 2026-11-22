@@ -2,6 +2,7 @@ import "dotenv/config";
 import app from "./src/app";
 import { env } from "./src/config/env";
 import { logger } from "./src/config/logger";
+import { redis } from "./src/config/redis";
 
 const server = app.listen(env.PORT, () => {
   logger.info(
@@ -11,18 +12,19 @@ const server = app.listen(env.PORT, () => {
 });
 
 // Graceful shutdown
-process.on("SIGTERM", () => {
-  logger.info("SIGTERM received - shutting down gracefully");
-  server.close(() => {
-    logger.info("Server closed");
+async function gracefulShutdown(signal: string): Promise<void> {
+  logger.info({ signal }, `${signal} received - shutting down gracefully`);
+  server.close(async () => {
+    logger.info("HTTP server closed");
+    try {
+      await redis.quit();
+      logger.info("Redis client disconnected");
+    } catch (err) {
+      logger.error({ err }, "Error closing Redis connection");
+    }
     process.exit(0);
   });
-});
+}
 
-process.on("SIGINT", () => {
-  logger.info("SIGINT received - shutting down gracefully");
-  server.close(() => {
-    logger.info("Server closed");
-    process.exit(0);
-  });
-});
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));

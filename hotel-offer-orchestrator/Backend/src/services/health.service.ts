@@ -40,6 +40,10 @@ async function pingTemporal(): Promise<{ status: "ok" | "error"; error?: string 
 
 /**
  * Runs all health checks concurrently and returns a HealthReport.
+ * Status rules:
+ * - "ok": redis ok, temporal ok, supplierA ok, supplierB ok
+ * - "degraded": redis ok, temporal ok, and AT LEAST ONE supplier ok
+ * - "error": otherwise (e.g. redis/temporal error or both suppliers down)
  */
 export async function getHealthReport(): Promise<HealthReport> {
   const [redisStatus, temporalStatus, supplierA, supplierB] = await Promise.all([
@@ -49,17 +53,21 @@ export async function getHealthReport(): Promise<HealthReport> {
     pingSupplier(env.SUPPLIER_B_URL, "Supplier B"),
   ]);
 
-  const allOk =
-    redisStatus.status === "ok" &&
-    temporalStatus.status === "ok" &&
-    supplierA.status === "ok" &&
-    supplierB.status === "ok";
+  const infraOk = redisStatus.status === "ok" && temporalStatus.status === "ok";
+  const bothSuppliersOk = supplierA.status === "ok" && supplierB.status === "ok";
+  const atLeastOneSupplierOk = supplierA.status === "ok" || supplierB.status === "ok";
 
-  const anyError =
-    redisStatus.status === "error" || temporalStatus.status === "error";
+  let status: "ok" | "degraded" | "error";
+  if (infraOk && bothSuppliersOk) {
+    status = "ok";
+  } else if (infraOk && atLeastOneSupplierOk) {
+    status = "degraded";
+  } else {
+    status = "error";
+  }
 
   return {
-    status: allOk ? "ok" : anyError ? "error" : "degraded",
+    status,
     redis: redisStatus,
     temporal: temporalStatus,
     supplierA,

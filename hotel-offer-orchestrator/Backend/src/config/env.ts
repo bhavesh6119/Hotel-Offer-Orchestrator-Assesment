@@ -33,6 +33,7 @@ const envSchema = z.object({
     .default("info"),
 
   CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(300),
+  PARTIAL_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(30),
 });
 
 export type Env = z.infer<typeof envSchema>;

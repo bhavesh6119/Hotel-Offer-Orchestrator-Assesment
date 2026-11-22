@@ -21,7 +21,7 @@ export async function fetchSupplierAOffers(city: string): Promise<HotelOffer[]> 
     const rawHotels = response.data;
 
     const mappedOffers: HotelOffer[] = rawHotels.map((h) => ({
-      name: h.name,
+      name: h.name.trim(),
       price: h.price,
       supplier: "Supplier A",
       commissionPct: h.commissionPct,
@@ -57,7 +57,7 @@ export async function fetchSupplierBOffers(city: string): Promise<HotelOffer[]> 
     const rawHotels = response.data;
 
     const mappedOffers: HotelOffer[] = rawHotels.map((h) => ({
-      name: h.name,
+      name: h.name.trim(),
       price: h.price,
       supplier: "Supplier B",
       commissionPct: h.commissionPct,

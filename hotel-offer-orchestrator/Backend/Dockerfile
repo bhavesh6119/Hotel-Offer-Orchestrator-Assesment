@@ -1,9 +1,10 @@
-FROM node:22-alpine AS builder
+# ── build stage ───────────────────────────────────────────────────
+FROM node:22-slim AS builder
 
 WORKDIR /app
 
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 
 COPY tsconfig.json ./
 COPY server.ts ./
@@ -11,15 +12,19 @@ COPY src/ ./src/
 
 RUN npm run build
 
-# ── production image ──────────────────────────────────────────────
-FROM node:22-alpine AS runner
+# ── production runtime stage ──────────────────────────────────────
+FROM node:22-slim AS runner
 
 WORKDIR /app
 
-COPY package.json ./
-RUN npm install --omit=dev
+ENV NODE_ENV=production
+
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
+
+USER node
 
 EXPOSE 3000
 
