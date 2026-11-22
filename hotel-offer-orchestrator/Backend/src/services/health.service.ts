@@ -5,13 +5,24 @@ import { HealthReport, SupplierHealthStatus } from "../types/hotel.types";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
 
+const PING_TIMEOUT_MS = 3000;
+
+type ServiceStatus = { status: "ok" | "error"; error?: string };
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), timeoutMs)),
+  ]);
+}
+
 async function pingSupplier(
   url: string,
   name: string,
 ): Promise<SupplierHealthStatus> {
   const start = Date.now();
   try {
-    await axios.get(url, { timeout: 3000 });
+    await axios.get(url, { timeout: PING_TIMEOUT_MS });
     return { status: "ok", latencyMs: Date.now() - start };
   } catch (err) {
     logger.warn({ err, name }, "Supplier health check failed");
@@ -19,20 +30,32 @@ async function pingSupplier(
   }
 }
 
-async function pingRedis(): Promise<{ status: "ok" | "error"; error?: string }> {
+async function pingRedis(): Promise<ServiceStatus> {
   try {
-    await redis.ping();
-    return { status: "ok" };
+    const pingPromise: Promise<ServiceStatus> = (async () => {
+      await redis.ping();
+      return { status: "ok" as const };
+    })();
+    return await withTimeout<ServiceStatus>(pingPromise, PING_TIMEOUT_MS, {
+      status: "error" as const,
+      error: "timeout",
+    });
   } catch (err) {
     return { status: "error", error: (err as Error).message };
   }
 }
 
-async function pingTemporal(): Promise<{ status: "ok" | "error"; error?: string }> {
+async function pingTemporal(): Promise<ServiceStatus> {
   try {
-    const client = await getTemporalClient();
-    await client.connection.workflowService.getSystemInfo({});
-    return { status: "ok" };
+    const temporalPromise: Promise<ServiceStatus> = (async () => {
+      const client = await getTemporalClient();
+      await client.connection.workflowService.getSystemInfo({});
+      return { status: "ok" as const };
+    })();
+    return await withTimeout<ServiceStatus>(temporalPromise, PING_TIMEOUT_MS, {
+      status: "error" as const,
+      error: "timeout",
+    });
   } catch (err) {
     return { status: "error", error: (err as Error).message };
   }

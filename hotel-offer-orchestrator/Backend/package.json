@@ -1,7 +1,7 @@
 {
   "name": "hotel-offer-orchestrator",
   "version": "1.0.0",
-  "description": "Backend service that orchestrates hotel offer aggregation via Temporal workflows",
+  "description": "Hotel offer aggregation service orchestrating mock suppliers via Temporal workflows and Redis caching",
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc",
@@ -13,7 +13,6 @@
     "test": "npm run build && node --test dist/src/utils/mergeOffers.test.js"
   },
   "dependencies": {
-    "@temporalio/activity": "^1.11.0",
     "@temporalio/client": "^1.11.0",
     "@temporalio/worker": "^1.11.0",
     "@temporalio/workflow": "^1.11.0",

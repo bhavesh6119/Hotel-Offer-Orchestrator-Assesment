@@ -1,4 +1,3 @@
-# ── build stage ───────────────────────────────────────────────────
 FROM node:22-slim AS builder
 
 WORKDIR /app
@@ -12,7 +11,6 @@ COPY src/ ./src/
 
 RUN npm run build
 
-# ── production runtime stage ──────────────────────────────────────
 FROM node:22-slim AS runner
 
 WORKDIR /app

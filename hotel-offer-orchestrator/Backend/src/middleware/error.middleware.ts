@@ -19,12 +19,12 @@ export class AppError extends Error {
 /**
  * Checks error and its cause chain recursively for matching patterns
  */
-function findInErrorChain(err: unknown, predicate: (e: any) => boolean): boolean {
-  let curr: any = err;
+function findInErrorChain(err: unknown, predicate: (e: unknown) => boolean): boolean {
+  let curr: unknown = err;
   let depth = 0;
-  while (curr && depth < 10) {
+  while (curr !== null && typeof curr === "object" && depth < 10) {
     if (predicate(curr)) return true;
-    curr = curr.cause;
+    curr = "cause" in curr ? (curr as { cause?: unknown }).cause : undefined;
     depth++;
   }
   return false;
@@ -39,7 +39,6 @@ export function errorHandler(
   err: Error,
   req: Request,
   res: Response,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _next: NextFunction,
 ): void {
   logger.error({ err, url: req.originalUrl, method: req.method }, "Error processing request");
@@ -63,13 +62,16 @@ export function errorHandler(
   }
 
   // 3. Workflow failure whose root cause is ApplicationFailure "All suppliers unavailable" -> 503
-  const isAllSuppliersUnavailable = findInErrorChain(err, (e) => {
-    return (
-      (e.type === "ApplicationFailure" || e.name === "ApplicationFailure") &&
-      typeof e.message === "string" &&
-      e.message.includes("All suppliers unavailable")
-    );
-  }) || (typeof err.message === "string" && err.message.includes("All suppliers unavailable"));
+  const isAllSuppliersUnavailable =
+    findInErrorChain(err, (e) => {
+      if (typeof e !== "object" || e === null) return false;
+      const rec = e as Record<string, unknown>;
+      return (
+        (rec.type === "ApplicationFailure" || rec.name === "ApplicationFailure") &&
+        typeof rec.message === "string" &&
+        rec.message.includes("All suppliers unavailable")
+      );
+    }) || (typeof err.message === "string" && err.message.includes("All suppliers unavailable"));
 
   if (isAllSuppliersUnavailable) {
     res.status(503).json({
@@ -80,8 +82,10 @@ export function errorHandler(
 
   // 4. Temporal or Redis connection issues -> 503
   const isConnectionProblem = findInErrorChain(err, (e) => {
-    const msg = String(e?.message || "");
-    const code = String(e?.code || "");
+    if (typeof e !== "object" || e === null) return false;
+    const rec = e as Record<string, unknown>;
+    const msg = typeof rec.message === "string" ? rec.message : "";
+    const code = typeof rec.code === "string" ? rec.code : "";
     return (
       msg.includes("Failed to connect before the deadline") ||
       msg.includes("ECONNREFUSED") ||
