@@ -1,17 +1,11 @@
-/**
- * hotelOffer.workflow.ts
- *
- * DETERMINISM RULES (Temporal requirement):
- *   - No network calls, no Redis, no logger, no Date.now(), no Math.random()
- *   - Only pure helpers and @temporalio/workflow imports are allowed here
- */
+// Temporal workflows must be deterministic for replay execution.
+// All side effects and network I/O must run inside activities.
 import { proxyActivities, ActivityOptions, ApplicationFailure } from "@temporalio/workflow";
 import type { fetchSupplierAOffers, fetchSupplierBOffers } from "../activities/supplier.activities";
 import type { saveOffersToCache } from "../activities/cache.activities";
 import { mergeOffers } from "../../utils/mergeOffers";
 import { HotelOffer, WorkflowResult } from "../../types/hotel.types";
 
-/** Shared type describing all activities used by this workflow */
 type Activities = {
   fetchSupplierAOffers: typeof fetchSupplierAOffers;
   fetchSupplierBOffers: typeof fetchSupplierBOffers;
@@ -29,12 +23,6 @@ const activityOptions: ActivityOptions = {
 
 const acts = proxyActivities<Activities>(activityOptions);
 
-/**
- * @workflow hotelOfferWorkflow
- * @description Runs both supplier activities in parallel, tolerates one failure,
- *              merges surviving offers, caches the result in Redis, and returns
- *              { hotels, warnings }.
- */
 export async function hotelOfferWorkflow(city: string): Promise<WorkflowResult> {
   const warnings: string[] = [];
   let offersA: HotelOffer[] | null = null;
@@ -57,7 +45,6 @@ export async function hotelOfferWorkflow(city: string): Promise<WorkflowResult> 
     warnings.push("Supplier B unavailable");
   }
 
-  // If BOTH suppliers failed
   if (offersA === null && offersB === null) {
     throw ApplicationFailure.nonRetryable("All suppliers unavailable");
   }
@@ -65,13 +52,9 @@ export async function hotelOfferWorkflow(city: string): Promise<WorkflowResult> 
   const validA = offersA ?? [];
   const validB = offersB ?? [];
 
-  // Deterministic pure merge (sorted by price ascending, tie -> name A-Z)
   const merged = mergeOffers(validA, validB);
-
-  // When warnings.length > 0, result is partial and gets a shorter TTL
   const isPartial = warnings.length > 0;
 
-  // Persist to Redis via activity
   await acts.saveOffersToCache(city, merged, isPartial);
 
   return {

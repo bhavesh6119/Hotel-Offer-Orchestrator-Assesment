@@ -1,20 +1,4 @@
 services:
-  postgres:
-    image: postgres:12-bookworm
-    container_name: hoo-postgres
-    environment:
-      POSTGRES_USER: temporal
-      POSTGRES_PASSWORD: temporal_password
-      POSTGRES_DB: temporal
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U temporal -d temporal"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
   temporal:
     build:
       context: .
@@ -116,6 +100,3 @@ services:
       app:
         condition: service_healthy
     restart: unless-stopped
-
-volumes:
-  postgres_data:
